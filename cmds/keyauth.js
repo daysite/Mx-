@@ -1,5 +1,6 @@
 // commands/keyauth.js
 import fetch from 'node-fetch';
+import { isAdmin, addAdmin, removeAdmin, listAdmins } from '../utils/adminManager.js';
 
 // ============================================
 // CONFIGURACIÓN KEYAUTH
@@ -7,6 +8,7 @@ import fetch from 'node-fetch';
 const SELLER_KEY = 'e8865aa548248882c092c1380ab9085e';
 const APP_NAME = 'ByPass-TopKoalas';
 const BASE_URL = 'https://www.realauthx.com/api';
+const OWNER_NUMBER = '51924537931'; // 🔥 CAMBIA ESTO POR TU NÚMERO
 
 // ============================================
 // FUNCIÓN DE FETCH CON REINTENTOS
@@ -57,12 +59,26 @@ async function fetchWithRetry(url, maxRetries = 3) {
 }
 
 // ============================================
-// COMANDO PRINCIPAL - GENERAR LICENCIA CON DÍAS OBLIGATORIOS
+// COMANDO PRINCIPAL - GENERAR LICENCIA (SOLO ADMINS)
 // ============================================
 export default {
   command: ['key', 'auth', 'licencia', 'license', 'gen', 'generar'],
   category: 'admin',
   run: async ({ msg, sock, args, command }) => {
+    
+    // ============================================
+    // VERIFICAR SI EL USUARIO ESTÁ AUTORIZADO
+    // ============================================
+    const userNumber = msg.from.replace('@s.whatsapp.net', '');
+    
+    if (!isAdmin(userNumber)) {
+      return msg.reply(
+        `⛔ *Acceso Denegado*\n\n` +
+        `No tienes permiso para usar este comando.\n` +
+        `Solo los administradores autorizados pueden generar licencias.\n\n` +
+        `📌 *Si eres el owner:* Usa !addadmin [número] para agregar usuarios.`
+      );
+    }
     
     // ============================================
     // VALIDACIÓN: SI NO HAY ARGUMENTOS, MOSTRAR ERROR
@@ -116,7 +132,7 @@ export default {
         { quoted: msg }
       );
 
-      // Generar nombre de usuario automático (solo para KeyAuth, no lo usa el usuario)
+      // Generar nombre de usuario automático
       const autoUser = `user_${Date.now().toString(36)}`;
       
       // Construir URL para crear licencia
@@ -173,7 +189,126 @@ export default {
 };
 
 // ============================================
-// COMANDO: VALIDAR LICENCIA
+// COMANDO: AGREGAR ADMINISTRADOR (SOLO OWNER)
+// ============================================
+export const addAdmin = {
+  command: ['addadmin', 'adduser'],
+  category: 'owner',
+  run: async ({ msg, sock, args, command }) => {
+    
+    const userNumber = msg.from.replace('@s.whatsapp.net', '');
+    
+    // SOLO EL OWNER PUEDE AGREGAR ADMINISTRADORES
+    if (userNumber !== OWNER_NUMBER) {
+      return msg.reply(
+        `⛔ *Acceso Denegado*\n\n` +
+        `Este comando solo puede ser usado por el owner del bot.`
+      );
+    }
+    
+    const newAdmin = args[0]?.replace(/[^0-9]/g, '') || '';
+    
+    if (!newAdmin) {
+      return msg.reply(
+        `❌ *Uso correcto:* !addadmin [número]\n\n` +
+        `📌 *Ejemplo:* !addadmin 591712345678`
+      );
+    }
+    
+    if (addAdmin(newAdmin)) {
+      await msg.reply(
+        `✅ *Administrador agregado exitosamente*\n\n` +
+        `📌 *Número:* ${newAdmin}\n` +
+        `💡 *Ahora este usuario puede generar licencias con !key*`
+      );
+    } else {
+      await msg.reply(
+        `ℹ️ *El número ${newAdmin} ya es administrador*`
+      );
+    }
+  },
+};
+
+// ============================================
+// COMANDO: ELIMINAR ADMINISTRADOR (SOLO OWNER)
+// ============================================
+export const removeAdmin = {
+  command: ['deladmin', 'deluser', 'removeadmin'],
+  category: 'owner',
+  run: async ({ msg, sock, args, command }) => {
+    
+    const userNumber = msg.from.replace('@s.whatsapp.net', '');
+    
+    // SOLO EL OWNER PUEDE ELIMINAR ADMINISTRADORES
+    if (userNumber !== OWNER_NUMBER) {
+      return msg.reply(
+        `⛔ *Acceso Denegado*\n\n` +
+        `Este comando solo puede ser usado por el owner del bot.`
+      );
+    }
+    
+    const adminToRemove = args[0]?.replace(/[^0-9]/g, '') || '';
+    
+    if (!adminToRemove) {
+      return msg.reply(
+        `❌ *Uso correcto:* !deladmin [número]\n\n` +
+        `📌 *Ejemplo:* !deladmin 591712345678`
+      );
+    }
+    
+    if (removeAdmin(adminToRemove)) {
+      await msg.reply(
+        `✅ *Administrador eliminado exitosamente*\n\n` +
+        `📌 *Número:* ${adminToRemove}\n` +
+        `💡 *Este usuario ya no puede generar licencias*`
+      );
+    } else {
+      await msg.reply(
+        `ℹ️ *El número ${adminToRemove} no es administrador*`
+      );
+    }
+  },
+};
+
+// ============================================
+// COMANDO: LISTAR ADMINISTRADORES (SOLO OWNER)
+// ============================================
+export const listAdminsCmd = {
+  command: ['listadmins', 'listusers', 'admins'],
+  category: 'owner',
+  run: async ({ msg, sock, args, command }) => {
+    
+    const userNumber = msg.from.replace('@s.whatsapp.net', '');
+    
+    // SOLO EL OWNER PUEDE VER LA LISTA
+    if (userNumber !== OWNER_NUMBER) {
+      return msg.reply(
+        `⛔ *Acceso Denegado*\n\n` +
+        `Este comando solo puede ser usado por el owner del bot.`
+      );
+    }
+    
+    const admins = listAdmins();
+    
+    if (admins.length === 0) {
+      return msg.reply(
+        `📋 *No hay administradores registrados*\n\n` +
+        `💡 *Agrega uno con:* !addadmin [número]`
+      );
+    }
+    
+    let responseText = `👥 *Administradores Autorizados*\n\n`;
+    admins.forEach((admin, index) => {
+      responseText += `${index + 1}. ${admin}\n`;
+    });
+    responseText += `\n📌 *Total:* ${admins.length} administradores`;
+    
+    await msg.reply(responseText);
+  },
+};
+
+// ============================================
+// COMANDO: VALIDAR LICENCIA (PÚBLICO)
 // ============================================
 export const validate = {
   command: ['validar', 'check', 'verify'],
@@ -236,7 +371,11 @@ export const help = {
   category: 'admin',
   run: async ({ msg, sock, args, command }) => {
     
-    const responseText = 
+    const userNumber = msg.from.replace('@s.whatsapp.net', '');
+    const isUserAdmin = isAdmin(userNumber);
+    const isUserOwner = userNumber === OWNER_NUMBER;
+    
+    let responseText = 
       `📚 *Sistema de Licencias - ByPass-TopKoalas*\n\n` +
       `🔹 *Generar licencia*\n` +
       `   !key [días]\n` +
@@ -246,12 +385,20 @@ export const help = {
       `   Ej: !key 365 (1 año)\n\n` +
       `🔹 *Validar licencia*\n` +
       `   !validar CLAVE\n` +
-      `   Ej: !validar 1BKN19-UFBGLG-RCWWSY\n\n` +
-      `🔹 *Alias disponibles:*\n` +
-      `   !gen, !generar, !licencia, !auth, !license\n\n` +
-      `📌 *Importante:* Debes especificar los días, no se acepta solo !key\n` +
-      `📌 *Rango permitido:* 1 a 365 días`;
-
+      `   Ej: !validar 1BKN19-UFBGLG-RCWWSY\n\n`;
+    
+    if (isUserOwner) {
+      responseText += 
+        `🔹 *Administración (Solo Owner)*\n` +
+        `   !addadmin [número] - Agregar administrador\n` +
+        `   !deladmin [número] - Eliminar administrador\n` +
+        `   !listadmins - Listar administradores\n\n`;
+    }
+    
+    responseText += 
+      `📌 *Rango permitido:* 1 a 365 días\n` +
+      `📌 *Estado:* ${isUserAdmin ? '✅ Autorizado' : '⛔ No autorizado'}`;
+    
     await msg.reply(responseText);
   },
 };
