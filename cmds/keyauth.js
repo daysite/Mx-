@@ -8,7 +8,7 @@ import { isAdmin, addAdmin, removeAdmin, listAdmins } from '../utils/adminManage
 const SELLER_KEY = 'e8865aa548248882c092c1380ab9085e';
 const APP_NAME = 'ByPass-TopKoalas';
 const BASE_URL = 'https://www.realauthx.com/api';
-const OWNER_NUMBER = '51924537931'; // 🔥 CAMBIA ESTO POR TU NÚMERO
+const OWNER_NUMBER = '591XXXXXXXXX'; // 🔥 CAMBIA ESTO POR TU NÚMERO
 
 // ============================================
 // FUNCIÓN DE FETCH CON REINTENTOS
@@ -18,7 +18,7 @@ async function fetchWithRetry(url, maxRetries = 3) {
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      console.log(`🔄 Intento ${attempt} de ${maxRetries}`);
+      console.log(`🔄 Intento ${attempt} de ${maxRetries} para:`, url);
       
       const response = await fetch(url, {
         timeout: 30000,
@@ -44,18 +44,17 @@ async function fetchWithRetry(url, maxRetries = 3) {
       }
       
     } catch (error) {
-      lastError = error;
       console.error(`❌ Intento ${attempt} falló:`, error.message);
       
       if (attempt < maxRetries) {
         const waitTime = attempt * 2000;
         console.log(`⏳ Esperando ${waitTime}ms...`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
+      } else {
+        throw error;
       }
     }
   }
-  
-  throw lastError || new Error('Todos los intentos fallaron');
 }
 
 // ============================================
@@ -107,13 +106,11 @@ export default {
     // ============================================
     if (subcommand === 'gen' || subcommand === 'generate' || subcommand === 'crear') {
       
-      // VERIFICAR SI EL USUARIO ESTÁ AUTORIZADO
       if (!isAdmin(userNumber)) {
         return msg.reply(
           `⛔ *Acceso Denegado*\n\n` +
           `No tienes permiso para usar este comando.\n` +
-          `Solo los administradores autorizados pueden generar licencias.\n\n` +
-          `📌 *Si eres el owner:* Usa !key addadmin [número] para agregar usuarios.`
+          `Solo los administradores autorizados pueden generar licencias.`
         );
       }
       
@@ -131,14 +128,7 @@ export default {
       }
       
       if (dias < 1 || dias > 365) {
-        return msg.reply(
-          `❌ *Los días deben ser entre 1 y 365*\n\n` +
-          `📌 *Ejemplos:*\n` +
-          `!key gen 1   - 1 día\n` +
-          `!key gen 7   - 7 días\n` +
-          `!key gen 30  - 30 días\n` +
-          `!key gen 365 - 1 año`
-        );
+        return msg.reply(`❌ *Los días deben ser entre 1 y 365*`);
       }
 
       try {
@@ -188,7 +178,7 @@ export default {
     }
     
     // ============================================
-    // SUBCOMANDO: VALIDAR LICENCIA (validar)
+    // SUBCOMANDO: VALIDAR LICENCIA (validar) - CORREGIDO
     // ============================================
     else if (subcommand === 'validar' || subcommand === 'check' || subcommand === 'verify') {
       
@@ -208,20 +198,33 @@ export default {
           { quoted: msg }
         );
 
-        const url = `${BASE_URL}/v1/licenses/validate?app_name=${APP_NAME}&license_key=${licenseKey}`;
+        // ✅ URL CORREGIDA - Usando la API de Seller
+        const url = `${BASE_URL}/seller/?sellerkey=${SELLER_KEY}&type=check&key=${licenseKey}`;
         
         const data = await fetchWithRetry(url);
         
-        if (data.success && data.is_valid) {
-          const responseText = 
-            `✅ *Licencia VÁLIDA*\n\n` +
-            `🔑 *Clave:* \`${licenseKey}\`\n` +
-            `👤 *Usuario:* ${data.username || 'N/A'}\n` +
-            `📅 *Vence:* ${data.expires || 'N/A'}\n` +
-            `📊 *Estado:* ${data.status || 'Activa'}\n` +
-            `📱 *App:* ${APP_NAME}`;
+        if (data.success) {
+          const isValid = data.is_valid || data.status === 'active' || data.status === 'Activa';
+          
+          if (isValid) {
+            const responseText = 
+              `✅ *Licencia VÁLIDA*\n\n` +
+              `🔑 *Clave:* \`${licenseKey}\`\n` +
+              `👤 *Usuario:* ${data.username || 'N/A'}\n` +
+              `📅 *Vence:* ${data.expires || data.expiry || 'N/A'}\n` +
+              `📊 *Estado:* ${data.status || 'Activa'}\n` +
+              `📱 *App:* ${data.app_name || APP_NAME}`;
 
-          await sock.sendMessage(msg.chat, { text: responseText, edit: key });
+            await sock.sendMessage(msg.chat, { text: responseText, edit: key });
+          } else {
+            await sock.sendMessage(msg.chat, { 
+              text: 
+                `❌ *Licencia INVÁLIDA*\n\n` +
+                `🔑 *Clave:* \`${licenseKey}\`\n` +
+                `📌 *Motivo:* ${data.message || 'Licencia no encontrada o expirada'}`,
+              edit: key 
+            });
+          }
         } else {
           await sock.sendMessage(msg.chat, { 
             text: 
@@ -244,19 +247,13 @@ export default {
     else if (subcommand === 'addadmin' || subcommand === 'adduser') {
       
       if (userNumber !== OWNER_NUMBER) {
-        return msg.reply(
-          `⛔ *Acceso Denegado*\n\n` +
-          `Este comando solo puede ser usado por el owner del bot.`
-        );
+        return msg.reply(`⛔ *Acceso Denegado*\n\nEste comando solo puede ser usado por el owner del bot.`);
       }
       
       const newAdmin = restArgs[0]?.replace(/[^0-9]/g, '') || '';
       
       if (!newAdmin) {
-        return msg.reply(
-          `❌ *Uso correcto:* !key addadmin [número]\n\n` +
-          `📌 *Ejemplo:* !key addadmin 591712345678`
-        );
+        return msg.reply(`❌ *Uso correcto:* !key addadmin [número]\n\n📌 *Ejemplo:* !key addadmin 591712345678`);
       }
       
       if (addAdmin(newAdmin)) {
@@ -266,9 +263,7 @@ export default {
           `💡 *Ahora este usuario puede generar licencias con !key gen [días]*`
         );
       } else {
-        await msg.reply(
-          `ℹ️ *El número ${newAdmin} ya es administrador*`
-        );
+        await msg.reply(`ℹ️ *El número ${newAdmin} ya es administrador*`);
       }
     }
     
@@ -278,19 +273,13 @@ export default {
     else if (subcommand === 'deladmin' || subcommand === 'deluser' || subcommand === 'removeadmin') {
       
       if (userNumber !== OWNER_NUMBER) {
-        return msg.reply(
-          `⛔ *Acceso Denegado*\n\n` +
-          `Este comando solo puede ser usado por el owner del bot.`
-        );
+        return msg.reply(`⛔ *Acceso Denegado*\n\nEste comando solo puede ser usado por el owner del bot.`);
       }
       
       const adminToRemove = restArgs[0]?.replace(/[^0-9]/g, '') || '';
       
       if (!adminToRemove) {
-        return msg.reply(
-          `❌ *Uso correcto:* !key deladmin [número]\n\n` +
-          `📌 *Ejemplo:* !key deladmin 591712345678`
-        );
+        return msg.reply(`❌ *Uso correcto:* !key deladmin [número]\n\n📌 *Ejemplo:* !key deladmin 591712345678`);
       }
       
       if (removeAdmin(adminToRemove)) {
@@ -300,9 +289,7 @@ export default {
           `💡 *Este usuario ya no puede generar licencias*`
         );
       } else {
-        await msg.reply(
-          `ℹ️ *El número ${adminToRemove} no es administrador*`
-        );
+        await msg.reply(`ℹ️ *El número ${adminToRemove} no es administrador*`);
       }
     }
     
@@ -312,19 +299,13 @@ export default {
     else if (subcommand === 'listadmins' || subcommand === 'admins' || subcommand === 'listusers') {
       
       if (userNumber !== OWNER_NUMBER) {
-        return msg.reply(
-          `⛔ *Acceso Denegado*\n\n` +
-          `Este comando solo puede ser usado por el owner del bot.`
-        );
+        return msg.reply(`⛔ *Acceso Denegado*\n\nEste comando solo puede ser usado por el owner del bot.`);
       }
       
       const admins = listAdmins();
       
       if (admins.length === 0) {
-        return msg.reply(
-          `📋 *No hay administradores registrados*\n\n` +
-          `💡 *Agrega uno con:* !key addadmin [número]`
-        );
+        return msg.reply(`📋 *No hay administradores registrados*\n\n💡 *Agrega uno con:* !key addadmin [número]`);
       }
       
       let responseText = `👥 *Administradores Autorizados*\n\n`;
