@@ -67,7 +67,7 @@ export default {
   run: async ({ msg, sock, args, command }) => {
     
     // VERIFICAR SI EL USUARIO ESTÁ AUTORIZADO
-    const userNumber = msg.from.replace('@s.whatsapp.net', '');
+    const userNumber = msg.sender.replace('@s.whatsapp.net', ''); // ✅ CAMBIADO: msg.from → msg.sender
     
     if (!isAdmin(userNumber)) {
       return msg.reply(
@@ -187,12 +187,12 @@ export default {
 // ============================================
 // COMANDO: AGREGAR ADMINISTRADOR (SOLO OWNER)
 // ============================================
-export const cmdAddAdmin = {  // 👈 CAMBIÉ EL NOMBRE
+export const cmdAddAdmin = {
   command: ['addadmin', 'adduser'],
   category: 'owner',
   run: async ({ msg, sock, args, command }) => {
     
-    const userNumber = msg.from.replace('@s.whatsapp.net', '');
+    const userNumber = msg.sender.replace('@s.whatsapp.net', ''); // ✅ CAMBIADO: msg.from → msg.sender
     
     // SOLO EL OWNER PUEDE AGREGAR ADMINISTRADORES
     if (userNumber !== OWNER_NUMBER) {
@@ -228,12 +228,12 @@ export const cmdAddAdmin = {  // 👈 CAMBIÉ EL NOMBRE
 // ============================================
 // COMANDO: ELIMINAR ADMINISTRADOR (SOLO OWNER)
 // ============================================
-export const cmdRemoveAdmin = {  // 👈 CAMBIÉ EL NOMBRE
+export const cmdRemoveAdmin = {
   command: ['deladmin', 'deluser', 'removeadmin'],
   category: 'owner',
   run: async ({ msg, sock, args, command }) => {
     
-    const userNumber = msg.from.replace('@s.whatsapp.net', '');
+    const userNumber = msg.sender.replace('@s.whatsapp.net', ''); // ✅ CAMBIADO: msg.from → msg.sender
     
     // SOLO EL OWNER PUEDE ELIMINAR ADMINISTRADORES
     if (userNumber !== OWNER_NUMBER) {
@@ -269,12 +269,12 @@ export const cmdRemoveAdmin = {  // 👈 CAMBIÉ EL NOMBRE
 // ============================================
 // COMANDO: LISTAR ADMINISTRADORES (SOLO OWNER)
 // ============================================
-export const cmdListAdmins = {  // 👈 CAMBIÉ EL NOMBRE
+export const cmdListAdmins = {
   command: ['listadmins', 'listusers', 'admins'],
   category: 'owner',
   run: async ({ msg, sock, args, command }) => {
     
-    const userNumber = msg.from.replace('@s.whatsapp.net', '');
+    const userNumber = msg.sender.replace('@s.whatsapp.net', ''); // ✅ CAMBIADO: msg.from → msg.sender
     
     // SOLO EL OWNER PUEDE VER LA LISTA
     if (userNumber !== OWNER_NUMBER) {
@@ -367,7 +367,7 @@ export const help = {
   category: 'admin',
   run: async ({ msg, sock, args, command }) => {
     
-    const userNumber = msg.from.replace('@s.whatsapp.net', '');
+    const userNumber = msg.sender.replace('@s.whatsapp.net', ''); // ✅ CAMBIADO: msg.from → msg.sender
     const isUserAdmin = isAdmin(userNumber);
     const isUserOwner = userNumber === OWNER_NUMBER;
     
