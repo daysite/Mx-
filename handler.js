@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import gradient from 'gradient-string';
 import { getCachedMeta, setCachedMeta } from '#serialize';
-import { isAdmin } from '../utils/adminManager.js'; // 👈 NUEVO: Importar verificación de admin
+import { isAdmin } from './utils/adminManager.js';
 
 export default async (sock, msg) => {
 
