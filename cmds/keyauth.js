@@ -18,7 +18,7 @@ async function fetchWithRetry(url, maxRetries = 3) {
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      console.log(`🔄 Intento ${attempt} de ${maxRetries} para:`, url);
+      console.log(`🔄 Intento ${attempt} de ${maxRetries} para:`, url.substring(0, 100) + '...');
       
       const response = await fetch(url, {
         timeout: 30000,
@@ -37,13 +37,16 @@ async function fetchWithRetry(url, maxRetries = 3) {
       const text = await response.text();
       
       try {
-        return JSON.parse(text);
+        const data = JSON.parse(text);
+        console.log('📦 Respuesta:', JSON.stringify(data).substring(0, 200));
+        return data;
       } catch (parseError) {
         console.error('❌ Error parseando JSON:', text.substring(0, 100));
         throw new Error('Respuesta inválida del servidor');
       }
       
     } catch (error) {
+      lastError = error;
       console.error(`❌ Intento ${attempt} falló:`, error.message);
       
       if (attempt < maxRetries) {
@@ -178,7 +181,7 @@ export default {
     }
     
     // ============================================
-    // SUBCOMANDO: VALIDAR LICENCIA (validar) - CORREGIDO
+    // SUBCOMANDO: VALIDAR LICENCIA (validar) - CORREGIDO V2
     // ============================================
     else if (subcommand === 'validar' || subcommand === 'check' || subcommand === 'verify') {
       
@@ -198,42 +201,83 @@ export default {
           { quoted: msg }
         );
 
-        // ✅ URL CORREGIDA - Usando la API de Seller
-        const url = `${BASE_URL}/seller/?sellerkey=${SELLER_KEY}&type=check&key=${licenseKey}`;
+        // 🔥 PRIMER INTENTO: Usar la API con type=check
+        let url = `${BASE_URL}/seller/?sellerkey=${SELLER_KEY}&type=check&appname=${APP_NAME}&key=${licenseKey}`;
+        console.log('🔍 Intentando URL 1:', url);
         
-        const data = await fetchWithRetry(url);
-        
-        if (data.success) {
-          const isValid = data.is_valid || data.status === 'active' || data.status === 'Activa';
+        try {
+          const data = await fetchWithRetry(url);
           
-          if (isValid) {
+          if (data && data.success) {
+            const isValid = data.is_valid || data.status === 'active' || data.status === 'Activa';
+            
+            if (isValid) {
+              const responseText = 
+                `✅ *Licencia VÁLIDA*\n\n` +
+                `🔑 *Clave:* \`${licenseKey}\`\n` +
+                `👤 *Usuario:* ${data.username || 'N/A'}\n` +
+                `📅 *Vence:* ${data.expires || data.expiry || 'N/A'}\n` +
+                `📊 *Estado:* ${data.status || 'Activa'}\n` +
+                `📱 *App:* ${data.app_name || APP_NAME}`;
+
+              await sock.sendMessage(msg.chat, { text: responseText, edit: key });
+              return;
+            } else {
+              // La licencia no es válida según la respuesta
+              await sock.sendMessage(msg.chat, { 
+                text: 
+                  `❌ *Licencia INVÁLIDA*\n\n` +
+                  `🔑 *Clave:* \`${licenseKey}\`\n` +
+                  `📌 *Motivo:* ${data.message || 'Licencia no encontrada o expirada'}`,
+                edit: key 
+              });
+              return;
+            }
+          }
+        } catch (error) {
+          console.log('⚠️ Primer intento falló, probando alternativa...');
+        }
+        
+        // 🔥 SEGUNDO INTENTO: Usar la API pública (v1)
+        const url2 = `https://www.realauthx.com/api/v1/licenses/validate?app_name=${APP_NAME}&license_key=${licenseKey}`;
+        console.log('🔍 Intentando URL 2:', url2);
+        
+        try {
+          const data2 = await fetchWithRetry(url2);
+          
+          if (data2 && data2.success && data2.is_valid) {
             const responseText = 
               `✅ *Licencia VÁLIDA*\n\n` +
               `🔑 *Clave:* \`${licenseKey}\`\n` +
-              `👤 *Usuario:* ${data.username || 'N/A'}\n` +
-              `📅 *Vence:* ${data.expires || data.expiry || 'N/A'}\n` +
-              `📊 *Estado:* ${data.status || 'Activa'}\n` +
-              `📱 *App:* ${data.app_name || APP_NAME}`;
+              `👤 *Usuario:* ${data2.username || 'N/A'}\n` +
+              `📅 *Vence:* ${data2.expires || 'N/A'}\n` +
+              `📊 *Estado:* ${data2.status || 'Activa'}\n` +
+              `📱 *App:* ${data2.app_name || APP_NAME}`;
 
             await sock.sendMessage(msg.chat, { text: responseText, edit: key });
+            return;
           } else {
             await sock.sendMessage(msg.chat, { 
               text: 
                 `❌ *Licencia INVÁLIDA*\n\n` +
                 `🔑 *Clave:* \`${licenseKey}\`\n` +
-                `📌 *Motivo:* ${data.message || 'Licencia no encontrada o expirada'}`,
+                `📌 *Motivo:* ${data2?.message || 'Licencia no encontrada o expirada'}`,
               edit: key 
             });
+            return;
           }
-        } else {
-          await sock.sendMessage(msg.chat, { 
-            text: 
-              `❌ *Licencia INVÁLIDA*\n\n` +
-              `🔑 *Clave:* \`${licenseKey}\`\n` +
-              `📌 *Motivo:* ${data.message || 'Licencia no encontrada o expirada'}`,
-            edit: key 
-          });
+        } catch (error) {
+          console.log('⚠️ Segundo intento falló');
         }
+        
+        // Si ambos intentos fallaron
+        await sock.sendMessage(msg.chat, { 
+          text: 
+            `❌ *Licencia INVÁLIDA*\n\n` +
+            `🔑 *Clave:* \`${licenseKey}\`\n` +
+            `📌 *Motivo:* No se pudo verificar la licencia. Intenta nuevamente.`,
+          edit: key 
+        });
         
       } catch (error) {
         console.error('❌ Error en validación:', error);
