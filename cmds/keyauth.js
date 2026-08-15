@@ -84,7 +84,7 @@ export default {
         `   Ej: !key gen 30\n\n` +
         `🔹 *Validar licencia*\n` +
         `   !key validar CLAVE\n` +
-        `   Ej: !key validar 1BKN19-UFBGLG-RCWWSY\n\n`;
+        `   Ej: !key validar XCL2HK-WGSTQV-HIPJ29\n\n`;
       
       if (isUserOwner) {
         helpText += 
@@ -181,7 +181,7 @@ export default {
     }
     
     // ============================================
-    // SUBCOMANDO: VALIDAR LICENCIA (validar) - CORREGIDO V2
+    // SUBCOMANDO: VALIDAR LICENCIA (validar) - CORREGIDO DEFINITIVO
     // ============================================
     else if (subcommand === 'validar' || subcommand === 'check' || subcommand === 'verify') {
       
@@ -190,7 +190,7 @@ export default {
       if (!licenseKey) {
         return msg.reply(
           `❌ *Uso correcto:* !key validar CLAVE_LICENCIA\n\n` +
-          `📌 *Ejemplo:* !key validar 1BKN19-UFBGLG-RCWWSY`
+          `📌 *Ejemplo:* !key validar XCL2HK-WGSTQV-HIPJ29`
         );
       }
 
@@ -201,87 +201,51 @@ export default {
           { quoted: msg }
         );
 
-        // 🔥 PRIMER INTENTO: Usar la API con type=check
-        let url = `${BASE_URL}/seller/?sellerkey=${SELLER_KEY}&type=check&appname=${APP_NAME}&key=${licenseKey}`;
-        console.log('🔍 Intentando URL 1:', url);
+        // ✅ URL CORREGIDA: sin appname, solo sellerkey, type=check y key
+        const url = `${BASE_URL}/seller/?sellerkey=${SELLER_KEY}&type=check&key=${licenseKey}`;
         
-        try {
-          const data = await fetchWithRetry(url);
-          
-          if (data && data.success) {
-            const isValid = data.is_valid || data.status === 'active' || data.status === 'Activa';
-            
-            if (isValid) {
-              const responseText = 
-                `✅ *Licencia VÁLIDA*\n\n` +
-                `🔑 *Clave:* \`${licenseKey}\`\n` +
-                `👤 *Usuario:* ${data.username || 'N/A'}\n` +
-                `📅 *Vence:* ${data.expires || data.expiry || 'N/A'}\n` +
-                `📊 *Estado:* ${data.status || 'Activa'}\n` +
-                `📱 *App:* ${data.app_name || APP_NAME}`;
-
-              await sock.sendMessage(msg.chat, { text: responseText, edit: key });
-              return;
-            } else {
-              // La licencia no es válida según la respuesta
-              await sock.sendMessage(msg.chat, { 
-                text: 
-                  `❌ *Licencia INVÁLIDA*\n\n` +
-                  `🔑 *Clave:* \`${licenseKey}\`\n` +
-                  `📌 *Motivo:* ${data.message || 'Licencia no encontrada o expirada'}`,
-                edit: key 
-              });
-              return;
-            }
-          }
-        } catch (error) {
-          console.log('⚠️ Primer intento falló, probando alternativa...');
-        }
+        console.log('🔍 Validando URL:', url);
         
-        // 🔥 SEGUNDO INTENTO: Usar la API pública (v1)
-        const url2 = `https://www.realauthx.com/api/v1/licenses/validate?app_name=${APP_NAME}&license_key=${licenseKey}`;
-        console.log('🔍 Intentando URL 2:', url2);
+        const data = await fetchWithRetry(url);
         
-        try {
-          const data2 = await fetchWithRetry(url2);
-          
-          if (data2 && data2.success && data2.is_valid) {
-            const responseText = 
-              `✅ *Licencia VÁLIDA*\n\n` +
-              `🔑 *Clave:* \`${licenseKey}\`\n` +
-              `👤 *Usuario:* ${data2.username || 'N/A'}\n` +
-              `📅 *Vence:* ${data2.expires || 'N/A'}\n` +
-              `📊 *Estado:* ${data2.status || 'Activa'}\n` +
-              `📱 *App:* ${data2.app_name || APP_NAME}`;
-
-            await sock.sendMessage(msg.chat, { text: responseText, edit: key });
-            return;
-          } else {
-            await sock.sendMessage(msg.chat, { 
-              text: 
-                `❌ *Licencia INVÁLIDA*\n\n` +
-                `🔑 *Clave:* \`${licenseKey}\`\n` +
-                `📌 *Motivo:* ${data2?.message || 'Licencia no encontrada o expirada'}`,
-              edit: key 
-            });
-            return;
-          }
-        } catch (error) {
-          console.log('⚠️ Segundo intento falló');
-        }
-        
-        // Si ambos intentos fallaron
-        await sock.sendMessage(msg.chat, { 
-          text: 
-            `❌ *Licencia INVÁLIDA*\n\n` +
+        // Verificar si la respuesta es exitosa
+        if (data && data.success) {
+          // La licencia es válida
+          const responseText = 
+            `✅ *Licencia VÁLIDA*\n\n` +
             `🔑 *Clave:* \`${licenseKey}\`\n` +
-            `📌 *Motivo:* No se pudo verificar la licencia. Intenta nuevamente.`,
-          edit: key 
-        });
+            `📅 *Estado:* Activa\n` +
+            `📱 *App:* ${APP_NAME}\n` +
+            `📌 *La licencia es válida y está activa.`;
+
+          await sock.sendMessage(msg.chat, { text: responseText, edit: key });
+        } else {
+          // La licencia no es válida
+          await sock.sendMessage(msg.chat, { 
+            text: 
+              `❌ *Licencia INVÁLIDA*\n\n` +
+              `🔑 *Clave:* \`${licenseKey}\`\n` +
+              `📌 *Motivo:* ${data?.message || 'Licencia no encontrada o expirada'}`,
+            edit: key 
+          });
+        }
         
       } catch (error) {
         console.error('❌ Error en validación:', error);
-        await msg.reply(`❌ *Error:* ${error.message}`);
+        
+        // Si hay error de conexión, mostrar mensaje amigable
+        let errorMsg = '❌ *Error al validar licencia*\n\n';
+        if (error.message.includes('HTTP 400')) {
+          errorMsg += '⚠️ La clave tiene un formato incorrecto.\n';
+          errorMsg += '💡 Verifica que la clave sea válida (ej: XCL2HK-WGSTQV-HIPJ29)';
+        } else if (error.message.includes('HTTP 404')) {
+          errorMsg += '⚠️ La licencia no existe en el sistema.\n';
+          errorMsg += '💡 Genera una nueva con !key gen [días]';
+        } else {
+          errorMsg += `📌 ${error.message}`;
+        }
+        
+        await msg.reply(errorMsg);
       }
     }
     
@@ -376,7 +340,7 @@ export default {
         `   Ej: !key gen 30\n\n` +
         `🔹 *Validar licencia*\n` +
         `   !key validar CLAVE\n` +
-        `   Ej: !key validar 1BKN19-UFBGLG-RCWWSY\n\n`;
+        `   Ej: !key validar XCL2HK-WGSTQV-HIPJ29\n\n`;
       
       if (isUserOwner) {
         helpText += 
