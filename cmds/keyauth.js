@@ -66,9 +66,7 @@ export default {
   category: 'admin',
   run: async ({ msg, sock, args, command }) => {
     
-    // ============================================
     // VERIFICAR SI EL USUARIO ESTÁ AUTORIZADO
-    // ============================================
     const userNumber = msg.from.replace('@s.whatsapp.net', '');
     
     if (!isAdmin(userNumber)) {
@@ -80,9 +78,7 @@ export default {
       );
     }
     
-    // ============================================
     // VALIDACIÓN: SI NO HAY ARGUMENTOS, MOSTRAR ERROR
-    // ============================================
     if (!args || args.length === 0) {
       return msg.reply(
         `❌ *Falta especificar los días*\n\n` +
@@ -191,7 +187,7 @@ export default {
 // ============================================
 // COMANDO: AGREGAR ADMINISTRADOR (SOLO OWNER)
 // ============================================
-export const addAdmin = {
+export const cmdAddAdmin = {  // 👈 CAMBIÉ EL NOMBRE
   command: ['addadmin', 'adduser'],
   category: 'owner',
   run: async ({ msg, sock, args, command }) => {
@@ -232,7 +228,7 @@ export const addAdmin = {
 // ============================================
 // COMANDO: ELIMINAR ADMINISTRADOR (SOLO OWNER)
 // ============================================
-export const removeAdmin = {
+export const cmdRemoveAdmin = {  // 👈 CAMBIÉ EL NOMBRE
   command: ['deladmin', 'deluser', 'removeadmin'],
   category: 'owner',
   run: async ({ msg, sock, args, command }) => {
@@ -273,7 +269,7 @@ export const removeAdmin = {
 // ============================================
 // COMANDO: LISTAR ADMINISTRADORES (SOLO OWNER)
 // ============================================
-export const listAdminsCmd = {
+export const cmdListAdmins = {  // 👈 CAMBIÉ EL NOMBRE
   command: ['listadmins', 'listusers', 'admins'],
   category: 'owner',
   run: async ({ msg, sock, args, command }) => {
