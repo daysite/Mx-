@@ -1,4 +1,4 @@
-// commands/keyauth.js
+// commands/keyauth.js - VERSIÓN CON DÍAS PERSONALIZABLES
 import fetch from 'node-fetch';
 
 // ============================================
