@@ -6,6 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import gradient from 'gradient-string';
 import { getCachedMeta, setCachedMeta } from '#serialize';
+import { isAdmin } from '../utils/adminManager.js'; // 👈 NUEVO: Importar verificación de admin
 
 export default async (sock, msg) => {
 
@@ -38,6 +39,10 @@ const settings = await db.getSettings(botJid)
   const botBase = botJid.split('@')[0];
   const isBotAdmins = msg.isGroup ? adminSet.has(botBase) : false;
   const isAdmins = msg.isGroup ? adminSet.has(senderBase) : false;
+
+  // 👈 NUEVO: Verificar si el usuario está autorizado para comandos KeyAuth
+  const userNumber = sender.split('@')[0];
+  const isKeyAuthAdmin = isAdmin(userNumber);
 
   Promise.allSettled((global.cmdsExecute ?? []).filter(p => p.type === 'all').map(p => p.fn({ msg, sock, groupMetadata, participants, isAdmins, isBotAdmins, isOwner, __dirname: p.dirname }).catch(e => console.error(chalk.gray(`[ ✿ ] Error all-plugin ${p.key}: ${e.message}`)))));
 
@@ -206,6 +211,17 @@ if (!cmdData || user.muted === 1 || user.muted === true) {
 }
 
 const comando = msg.text.slice(usedPrefix.length)
+
+// 👈 NUEVO: Verificar si el comando es de KeyAuth y si el usuario está autorizado
+const keyAuthCommands = ['key', 'auth', 'licencia', 'license', 'gen', 'generar'];
+if (keyAuthCommands.includes(command) && !isKeyAuthAdmin) {
+  return msg.reply(
+    `⛔ *Acceso Denegado*\n\n` +
+    `No tienes permiso para usar este comando.\n` +
+    `Solo los administradores autorizados pueden generar licencias.\n\n` +
+    `📌 *Si eres el owner:* Usa !addadmin [número] para agregar usuarios.`
+  );
+}
 
 if (cmdData.isOwner && !global.owner.map(num => num + '@s.whatsapp.net').includes(sender)) {
   return msg.reply(`ꕤ El comando *${command}* no existe.\n✎ Usa *${usedPrefix}help* para ver la lista de comandos disponibles.`)
