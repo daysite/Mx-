@@ -57,25 +57,41 @@ async function fetchWithRetry(url, maxRetries = 3) {
 }
 
 // ============================================
-// COMANDO PRINCIPAL - SOLO LICENCIAS
+// COMANDO PRINCIPAL - GENERAR LICENCIA CON DÍAS
 // ============================================
 export default {
   command: ['key', 'auth', 'licencia', 'license', 'gen', 'generar'],
   category: 'admin',
   run: async ({ msg, sock, args, command }) => {
     
-    // Obtener días del argumento (opcional)
-    const dias = parseInt(args[0]) || 30; // Por defecto 30 días
+    // Obtener los días del argumento
+    let dias = 30; // Valor por defecto: 30 días
     
-    // Validar días
+    if (args.length > 0) {
+      const parsed = parseInt(args[0]);
+      if (!isNaN(parsed) && parsed > 0) {
+        dias = parsed;
+      } else {
+        return msg.reply(
+          `❌ *El valor debe ser un número válido*\n\n` +
+          `📌 *Ejemplos:*\n` +
+          `!key 1   - Licencia de 1 día\n` +
+          `!key 7   - Licencia de 7 días\n` +
+          `!key 30  - Licencia de 30 días\n` +
+          `!key     - Licencia de 30 días (por defecto)`
+        );
+      }
+    }
+    
+    // Validar días (mínimo 1, máximo 365)
     if (dias < 1 || dias > 365) {
       return msg.reply(
         `❌ *Los días deben ser entre 1 y 365*\n\n` +
-        `📌 *Uso correcto:*\n` +
-        `!key [días]  - Genera una licencia\n` +
-        `!key 30      - Genera licencia de 30 días\n` +
-        `!key 7       - Genera licencia de 7 días\n\n` +
-        `💡 *Sin argumentos genera 30 días por defecto*`
+        `📌 *Ejemplos:*\n` +
+        `!key 1   - 1 día\n` +
+        `!key 7   - 7 días\n` +
+        `!key 30  - 30 días\n` +
+        `!key 365 - 1 año`
       );
     }
 
@@ -83,11 +99,11 @@ export default {
       // Mostrar mensaje de espera
       const { key } = await sock.sendMessage(
         msg.chat,
-        { text: '⏳ *Generando licencia...*' },
+        { text: `⏳ *Generando licencia de ${dias} día${dias > 1 ? 's' : ''}...*` },
         { quoted: msg }
       );
 
-      // Generar nombre de usuario automático (basado en timestamp)
+      // Generar nombre de usuario automático (solo para KeyAuth, no lo usa el usuario)
       const autoUser = `user_${Date.now().toString(36)}`;
       
       // Construir URL para crear licencia
@@ -98,10 +114,20 @@ export default {
       if (data.success) {
         const licenseKey = data.key || data.keys?.[0] || 'N/A';
         
+        // Calcular fecha de expiración
+        const expiryDate = new Date();
+        expiryDate.setDate(expiryDate.getDate() + dias);
+        const formattedDate = expiryDate.toLocaleDateString('es-ES', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
+        
         const responseText = 
           `✅ *¡Licencia generada exitosamente!*\n\n` +
           `🔑 *Licencia:* \`${licenseKey}\`\n` +
-          `📅 *Duración:* ${dias} días\n` +
+          `📅 *Duración:* ${dias} día${dias > 1 ? 's' : ''}\n` +
+          `📆 *Vence:* ${formattedDate}\n` +
           `📱 *App:* ${APP_NAME}\n` +
           `📊 *Estado:* Activa\n\n` +
           `💡 *Para validar:* !validar ${licenseKey}\n` +
@@ -177,7 +203,7 @@ export const validate = {
             `❌ *Licencia INVÁLIDA*\n\n` +
             `🔑 *Clave:* \`${licenseKey}\`\n` +
             `📌 *Motivo:* ${data.message || 'Licencia no encontrada o expirada'}\n\n` +
-            `💡 *Solución:* Genera una nueva con !key`,
+            `💡 *Solución:* Genera una nueva con !key [días]`,
           edit: key 
         });
       }
@@ -201,14 +227,16 @@ export const help = {
       `📚 *Sistema de Licencias - ByPass-TopKoalas*\n\n` +
       `🔹 *Generar licencia*\n` +
       `   !key [días]\n` +
-      `   Ej: !key 30  (genera 30 días)\n` +
-      `   Ej: !key     (genera 30 días por defecto)\n\n` +
+      `   Ej: !key 1   (1 día)\n` +
+      `   Ej: !key 7   (7 días)\n` +
+      `   Ej: !key 30  (30 días)\n` +
+      `   Ej: !key     (30 días por defecto)\n\n` +
       `🔹 *Validar licencia*\n` +
       `   !validar CLAVE\n` +
       `   Ej: !validar 1BKN19-UFBGLG-RCWWSY\n\n` +
       `🔹 *Alias disponibles:*\n` +
       `   !gen, !generar, !licencia, !auth, !license\n\n` +
-      `📌 *Tu aplicación solo usa la clave, sin necesidad de usuario*`;
+      `📌 *Rango permitido:* 1 a 365 días`;
 
     await msg.reply(responseText);
   },
