@@ -8,7 +8,7 @@ import { isAdmin, addAdmin, removeAdmin, listAdmins } from '../utils/adminManage
 const SELLER_KEY = 'e8865aa548248882c092c1380ab9085e';
 const APP_NAME = 'ByPass-TopKoalas';
 const BASE_URL = 'https://www.realauthx.com/api';
-const OWNER_NUMBER = '591XXXXXXXXX'; // 🔥 CAMBIA ESTO POR TU NÚMERO
+const OWNER_NUMBER = '51924537931'; // 🔥 CAMBIA ESTO POR TU NÚMERO
 
 // ============================================
 // FUNCIÓN DE FETCH CON REINTENTOS
