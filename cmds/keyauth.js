@@ -8,7 +8,7 @@ import { isAdmin, addAdmin, removeAdmin, listAdmins } from '../utils/adminManage
 const SELLER_KEY = 'e8865aa548248882c092c1380ab9085e';
 const APP_NAME = 'ByPass-TopKoalas';
 const BASE_URL = 'https://www.realauthx.com/api';
-const OWNER_NUMBER = '51924537931'; // 🔥 CAMBIA ESTO POR TU NÚMERO
+const OWNER_NUMBER = '591XXXXXXXXX'; // 🔥 CAMBIA ESTO POR TU NÚMERO
 
 // ============================================
 // FUNCIÓN DE FETCH CON REINTENTOS
@@ -84,7 +84,7 @@ export default {
         `   Ej: !key gen 30\n\n` +
         `🔹 *Validar licencia*\n` +
         `   !key validar CLAVE\n` +
-        `   Ej: !key validar XCL2HK-WGSTQV-HIPJ29\n\n`;
+        `   Ej: !key validar YKFR2Y-X428GX-OFSOU3\n\n`;
       
       if (isUserOwner) {
         helpText += 
@@ -181,7 +181,7 @@ export default {
     }
     
     // ============================================
-    // SUBCOMANDO: VALIDAR LICENCIA (validar) - CORREGIDO DEFINITIVO
+    // SUBCOMANDO: VALIDAR LICENCIA (validar) - API PÚBLICA
     // ============================================
     else if (subcommand === 'validar' || subcommand === 'check' || subcommand === 'verify') {
       
@@ -190,7 +190,7 @@ export default {
       if (!licenseKey) {
         return msg.reply(
           `❌ *Uso correcto:* !key validar CLAVE_LICENCIA\n\n` +
-          `📌 *Ejemplo:* !key validar XCL2HK-WGSTQV-HIPJ29`
+          `📌 *Ejemplo:* !key validar YKFR2Y-X428GX-OFSOU3`
         );
       }
 
@@ -201,26 +201,26 @@ export default {
           { quoted: msg }
         );
 
-        // ✅ URL CORREGIDA: sin appname, solo sellerkey, type=check y key
-        const url = `${BASE_URL}/seller/?sellerkey=${SELLER_KEY}&type=check&key=${licenseKey}`;
+        // ✅ USANDO API PÚBLICA (sin sellerkey)
+        const url = `https://www.realauthx.com/api/v1/licenses/validate?app_name=${APP_NAME}&license_key=${licenseKey}`;
         
-        console.log('🔍 Validando URL:', url);
+        console.log('🔍 Validando URL (API Pública):', url);
         
         const data = await fetchWithRetry(url);
         
-        // Verificar si la respuesta es exitosa
-        if (data && data.success) {
-          // La licencia es válida
+        // La respuesta de la API pública tiene: { success: true, is_valid: true, ... }
+        if (data && data.success && data.is_valid) {
           const responseText = 
             `✅ *Licencia VÁLIDA*\n\n` +
             `🔑 *Clave:* \`${licenseKey}\`\n` +
-            `📅 *Estado:* Activa\n` +
-            `📱 *App:* ${APP_NAME}\n` +
-            `📌 *La licencia es válida y está activa.`;
+            `👤 *Usuario:* ${data.username || 'N/A'}\n` +
+            `📅 *Vence:* ${data.expires || 'N/A'}\n` +
+            `📊 *Estado:* ${data.status || 'Activa'}\n` +
+            `📱 *App:* ${data.app_name || APP_NAME}`;
 
           await sock.sendMessage(msg.chat, { text: responseText, edit: key });
         } else {
-          // La licencia no es válida
+          // Si la licencia no es válida
           await sock.sendMessage(msg.chat, { 
             text: 
               `❌ *Licencia INVÁLIDA*\n\n` +
@@ -233,14 +233,13 @@ export default {
       } catch (error) {
         console.error('❌ Error en validación:', error);
         
-        // Si hay error de conexión, mostrar mensaje amigable
         let errorMsg = '❌ *Error al validar licencia*\n\n';
-        if (error.message.includes('HTTP 400')) {
+        if (error.message.includes('HTTP 404')) {
+          errorMsg += '⚠️ La API de validación no está disponible.\n';
+          errorMsg += '💡 Verifica tu conexión o intenta más tarde.';
+        } else if (error.message.includes('HTTP 400')) {
           errorMsg += '⚠️ La clave tiene un formato incorrecto.\n';
-          errorMsg += '💡 Verifica que la clave sea válida (ej: XCL2HK-WGSTQV-HIPJ29)';
-        } else if (error.message.includes('HTTP 404')) {
-          errorMsg += '⚠️ La licencia no existe en el sistema.\n';
-          errorMsg += '💡 Genera una nueva con !key gen [días]';
+          errorMsg += '💡 Asegúrate de copiar la clave completa (ej: YKFR2Y-X428GX-OFSOU3)';
         } else {
           errorMsg += `📌 ${error.message}`;
         }
@@ -340,7 +339,7 @@ export default {
         `   Ej: !key gen 30\n\n` +
         `🔹 *Validar licencia*\n` +
         `   !key validar CLAVE\n` +
-        `   Ej: !key validar XCL2HK-WGSTQV-HIPJ29\n\n`;
+        `   Ej: !key validar YKFR2Y-X428GX-OFSOU3\n\n`;
       
       if (isUserOwner) {
         helpText += 
