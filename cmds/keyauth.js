@@ -9,6 +9,56 @@ const APP_NAME = 'ByPass-TopKoalas';
 const BASE_URL = 'https://www.realauthx.com/api';
 
 // ============================================
+// FUNCIÓN DE FETCH CON REINTENTOS AUTOMÁTICOS
+// ============================================
+async function fetchWithRetry(url, maxRetries = 3) {
+  let lastError = null;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`🔄 Intento ${attempt} de ${maxRetries} para KeyAuth`);
+      
+      const response = await fetch(url, {
+        timeout: 30000, // 30 segundos de timeout
+        headers: {
+          'User-Agent': 'ByPass-TopKoalas-Bot/1.0',
+          'Accept': 'application/json',
+          'Connection': 'keep-alive'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const text = await response.text();
+      
+      // Intentar parsear JSON
+      try {
+        const data = JSON.parse(text);
+        return data;
+      } catch (parseError) {
+        console.error('❌ Error parseando JSON:', text.substring(0, 100));
+        throw new Error('Respuesta inválida del servidor');
+      }
+      
+    } catch (error) {
+      lastError = error;
+      console.error(`❌ Intento ${attempt} falló:`, error.message);
+      
+      if (attempt < maxRetries) {
+        // Esperar antes de reintentar (backoff exponencial)
+        const waitTime = attempt * 3000;
+        console.log(`⏳ Esperando ${waitTime}ms antes de reintentar...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+    }
+  }
+  
+  throw lastError || new Error('Todos los intentos fallaron');
+}
+
+// ============================================
 // COMANDO PRINCIPAL UNIFICADO
 // ============================================
 export default {
@@ -57,6 +107,59 @@ export default {
 
       switch (subcommand) {
         // ============================================
+        // SUBCOMANDO: GENERAR LICENCIA (el más importante)
+        // ============================================
+        case 'gen':
+        case 'generate':
+        case 'crearlic': {
+          const usuario = restArgs[0]?.replace('@', '').trim() || '';
+          const dias = parseInt(restArgs[1]) || 30;
+          
+          if (!usuario) {
+            await sock.sendMessage(msg.chat, { 
+              text: `❌ *Uso correcto:* !key gen @usuario [días]\n\n📌 Ejemplo: !key gen @Danizin 30`,
+              edit: key 
+            });
+            return;
+          }
+
+          if (dias < 1 || dias > 365) {
+            await sock.sendMessage(msg.chat, { 
+              text: '❌ Los días deben ser entre 1 y 365',
+              edit: key 
+            });
+            return;
+          }
+
+          // Actualizar mensaje a "generando"
+          await sock.sendMessage(msg.chat, { 
+            text: `⏳ *Generando licencia para ${usuario}...*\n🔄 Intentando conectar con KeyAuth...`,
+            edit: key 
+          });
+
+          url = `${BASE_URL}/seller/?sellerkey=${SELLER_KEY}&type=add&appname=${APP_NAME}&username=${usuario}&duration=${dias}`;
+          
+          // USAR FETCH CON REINTENTOS
+          data = await fetchWithRetry(url);
+          
+          if (data.success) {
+            const licenseKey = data.key || data.keys?.[0] || 'N/A';
+            responseText = 
+              `✅ *¡Licencia generada exitosamente!*\n\n` +
+              `👤 *Usuario:* ${usuario}\n` +
+              `🔑 *Licencia:* \`${licenseKey}\`\n` +
+              `📅 *Duración:* ${dias} días\n` +
+              `📱 *App:* ${data.app_name || APP_NAME}\n` +
+              `📊 *Estado:* Activa\n\n` +
+              `💡 *Validar:* !key check ${licenseKey}\n` +
+              `💡 *O usa:* !validarlic ${licenseKey}`;
+          } else {
+            responseText = `❌ *Error:* ${data.message || 'No se pudo generar la licencia'}`;
+          }
+          break;
+        }
+
+        // ============================================
         // SUBCOMANDO: CREAR USUARIO
         // ============================================
         case 'user':
@@ -90,10 +193,14 @@ export default {
             return;
           }
 
+          await sock.sendMessage(msg.chat, { 
+            text: `⏳ *Creando usuario ${username}...*\n🔄 Intentando conectar con KeyAuth...`,
+            edit: key 
+          });
+
           url = `${BASE_URL}/seller/?sellerkey=${SELLER_KEY}&type=adduser&appname=${APP_NAME}&user=${username}&pass=${password}&email=${encodeURIComponent(email)}`;
           
-          const res = await fetch(url);
-          data = await res.json();
+          data = await fetchWithRetry(url);
           
           if (data.success) {
             responseText = 
@@ -110,51 +217,6 @@ export default {
               errorMsg = `El usuario *${username}* ya existe. Prueba con otro nombre.`;
             }
             responseText = `❌ *Error:* ${errorMsg}`;
-          }
-          break;
-        }
-
-        // ============================================
-        // SUBCOMANDO: GENERAR LICENCIA
-        // ============================================
-        case 'gen':
-        case 'generate':
-        case 'crearlic': {
-          const usuario = restArgs[0]?.replace('@', '').trim() || '';
-          const dias = parseInt(restArgs[1]) || 30;
-          
-          if (!usuario) {
-            await sock.sendMessage(msg.chat, { 
-              text: `❌ *Uso correcto:* !key gen @usuario [días]\n\n📌 Ejemplo: !key gen @Danizin 30`,
-              edit: key 
-            });
-            return;
-          }
-
-          if (dias < 1 || dias > 365) {
-            await sock.sendMessage(msg.chat, { 
-              text: '❌ Los días deben ser entre 1 y 365',
-              edit: key 
-            });
-            return;
-          }
-
-          url = `${BASE_URL}/seller/?sellerkey=${SELLER_KEY}&type=add&appname=${APP_NAME}&username=${usuario}&duration=${dias}`;
-          
-          const res = await fetch(url);
-          data = await res.json();
-          
-          if (data.success) {
-            responseText = 
-              `✅ *¡Licencia generada exitosamente!*\n\n` +
-              `👤 *Usuario:* ${usuario}\n` +
-              `🔑 *Licencia:* \`${data.key || data.keys?.[0] || 'N/A'}\`\n` +
-              `📅 *Duración:* ${dias} días\n` +
-              `📱 *App:* ${APP_NAME}\n` +
-              `📊 *Estado:* Activa\n\n` +
-              `💡 *Validar:* !key check ${data.key || data.keys?.[0]}`;
-          } else {
-            responseText = `❌ *Error:* ${data.message || 'No se pudo generar la licencia'}`;
           }
           break;
         }
@@ -202,11 +264,15 @@ export default {
             return;
           }
 
+          await sock.sendMessage(msg.chat, { 
+            text: `⏳ *Creando usuario ${username} y generando licencia...*\n🔄 Intentando conectar con KeyAuth...`,
+            edit: key 
+          });
+
           // PASO 1: Crear usuario
           const userUrl = `${BASE_URL}/seller/?sellerkey=${SELLER_KEY}&type=adduser&appname=${APP_NAME}&user=${username}&pass=${password}&email=${encodeURIComponent(email)}`;
           
-          const userRes = await fetch(userUrl);
-          const userData = await userRes.json();
+          const userData = await fetchWithRetry(userUrl);
           
           if (!userData.success) {
             let errorMsg = userData.message || 'No se pudo crear el usuario';
@@ -223,19 +289,19 @@ export default {
           // PASO 2: Generar licencia
           const licUrl = `${BASE_URL}/seller/?sellerkey=${SELLER_KEY}&type=add&appname=${APP_NAME}&username=${username}&duration=${dias}`;
           
-          const licRes = await fetch(licUrl);
-          const licData = await licRes.json();
+          const licData = await fetchWithRetry(licUrl);
           
           if (licData.success) {
+            const licenseKey = licData.key || licData.keys?.[0] || 'N/A';
             responseText = 
               `✅ *¡Usuario y licencia creados exitosamente!*\n\n` +
               `👤 *Usuario:* ${username}\n` +
               `🔑 *Contraseña:* \`${password}\`\n` +
               `📧 *Email:* ${email}\n` +
-              `🔑 *Licencia:* \`${licData.key || licData.keys?.[0] || 'N/A'}\`\n` +
+              `🔑 *Licencia:* \`${licenseKey}\`\n` +
               `📅 *Duración:* ${dias} días\n` +
               `📱 *App:* ${APP_NAME}\n\n` +
-              `💡 *Validar:* !key check ${licData.key || licData.keys?.[0]}`;
+              `💡 *Validar:* !key check ${licenseKey}`;
           } else {
             responseText = 
               `⚠️ *Usuario creado pero error al generar licencia*\n\n` +
@@ -262,10 +328,14 @@ export default {
             return;
           }
 
+          await sock.sendMessage(msg.chat, { 
+            text: `⏳ *Validando licencia...*\n🔄 Intentando conectar con KeyAuth...`,
+            edit: key 
+          });
+
           url = `${BASE_URL}/v1/licenses/validate?app_name=${APP_NAME}&license_key=${licenseKey}`;
           
-          const res = await fetch(url);
-          data = await res.json();
+          data = await fetchWithRetry(url);
           
           if (data.success && data.is_valid) {
             responseText = 
@@ -290,10 +360,14 @@ export default {
         case 'users':
         case 'list':
         case 'lista': {
+          await sock.sendMessage(msg.chat, { 
+            text: `⏳ *Obteniendo lista de usuarios...*`,
+            edit: key 
+          });
+
           url = `${BASE_URL}/seller/?sellerkey=${SELLER_KEY}&type=listusers&appname=${APP_NAME}`;
           
-          const res = await fetch(url);
-          data = await res.json();
+          data = await fetchWithRetry(url);
           
           if (data.success && data.users) {
             const users = JSON.parse(data.users);
@@ -321,10 +395,14 @@ export default {
         case 'info':
         case 'estado':
         case 'status': {
+          await sock.sendMessage(msg.chat, { 
+            text: `⏳ *Obteniendo información...*`,
+            edit: key 
+          });
+
           url = `${BASE_URL}/seller/?sellerkey=${SELLER_KEY}&type=appinfo&appname=${APP_NAME}`;
           
-          const res = await fetch(url);
-          data = await res.json();
+          data = await fetchWithRetry(url);
           
           if (data.success) {
             responseText = 
@@ -349,12 +427,12 @@ export default {
         default: {
           responseText = 
             `📚 *Sistema de Licencias - ByPass-TopKoalas*\n\n` +
-            `🔹 *Crear usuario*\n` +
-            `   !key user USUARIO CONTRASEÑA [EMAIL]\n` +
-            `   Ej: !key user Danizin MiClave123\n\n` +
             `🔹 *Generar licencia*\n` +
             `   !key gen @usuario [días]\n` +
             `   Ej: !key gen @Danizin 30\n\n` +
+            `🔹 *Crear usuario*\n` +
+            `   !key user USUARIO CONTRASEÑA [EMAIL]\n` +
+            `   Ej: !key user Danizin MiClave123\n\n` +
             `🔹 *Crear usuario + licencia*\n` +
             `   !key full USUARIO CONTRASEÑA [DÍAS] [EMAIL]\n` +
             `   Ej: !key full Danizin MiClave123 30\n\n` +
@@ -365,7 +443,8 @@ export default {
             `   !key users\n\n` +
             `🔹 *Info de la app*\n` +
             `   !key info\n\n` +
-            `📌 *Alias:* !auth, !licencia, !license`;
+            `📌 *Alias:* !auth, !licencia, !license\n` +
+            `🔄 *El sistema reintenta automáticamente si hay errores de conexión*`;
           break;
         }
       }
@@ -379,11 +458,17 @@ export default {
       let errorMessage = '❌ *Error al procesar la solicitud*\n\n';
       
       if (error.message.includes('Premature close') || error.message.includes('ECONNRESET')) {
-        errorMessage += '⚠️ La conexión con la API se cerró inesperadamente.\n';
-        errorMessage += '💡 Intenta nuevamente en unos segundos.';
+        errorMessage += '⚠️ La API no respondió a tiempo.\n';
+        errorMessage += '💡 El sistema reintentó automáticamente 3 veces.\n';
+        errorMessage += '💡 Intenta nuevamente en unos segundos.\n\n';
+        errorMessage += '📌 Si el problema persiste, verifica tu conexión a internet.';
       } else if (error.message.includes('fetch')) {
         errorMessage += '⚠️ Error de conexión con el servidor.\n';
         errorMessage += '💡 Verifica tu conexión a internet.';
+      } else if (error.message.includes('Todos los intentos fallaron')) {
+        errorMessage += '⚠️ La API no respondió después de 3 intentos.\n';
+        errorMessage += '💡 La API puede estar caída o sobrecargada.\n';
+        errorMessage += '💡 Espera unos minutos y vuelve a intentar.';
       } else {
         errorMessage += `📌 Detalle: ${error.message}`;
       }
