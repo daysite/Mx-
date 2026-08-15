@@ -5,363 +5,397 @@ import fetch from 'node-fetch';
 // CONFIGURACIÓN KEYAUTH
 // ============================================
 const SELLER_KEY = 'e8865aa548248882c092c1380ab9085e';
-const APP_NAME = 'ByPass-TopKoalas'; // Nombre CORRECTO de la app
+const APP_NAME = 'ByPass-TopKoalas';
 const BASE_URL = 'https://www.realauthx.com/api';
 
 // ============================================
-// COMANDO PRINCIPAL: !key
+// COMANDO 1: GENERAR LICENCIA
 // ============================================
-export default {
-  command: ['key', 'keyauth', 'lic'],
+export const genLicense = {
+  command: ['genlic', 'generarlicencia', 'gl'],
   category: 'admin',
   run: async ({ msg, sock, args, command }) => {
     
-    // Si no hay argumentos, mostrar ayuda
-    if (args.length === 0) {
+    const usuario = args[0]?.replace('@', '').trim() || '';
+    const dias = parseInt(args[1]) || 30;
+    
+    if (!usuario) {
       return msg.reply(
-        `📚 *Sistema de Licencias - ByPass-TopKoalas*\n\n` +
-        `🔹 !key gen @usuario [días] - Generar licencia\n` +
-        `🔹 !key validar CLAVE - Validar licencia\n` +
-        `🔹 !key listusers - Listar usuarios\n` +
-        `🔹 !key listlic - Listar licencias\n` +
-        `🔹 !key del CLAVE - Desactivar licencia\n` +
-        `🔹 !key extend CLAVE [días] - Extender licencia\n` +
-        `🔹 !key info - Info de la app\n` +
-        `🔹 !key help - Esta ayuda\n\n` +
-        `📌 *Ejemplo:* !key gen @Danizin 30`
+        `❌ *Uso correcto:*\n` +
+        `!genlic @usuario [días]\n\n` +
+        `📌 *Ejemplos:*\n` +
+        `!genlic @Danizin 30\n` +
+        `!genlic @Juan 7`
       );
     }
 
-    const subcommand = args[0].toLowerCase();
-    const restArgs = args.slice(1);
+    // Validar días
+    if (dias < 1 || dias > 365) {
+      return msg.reply('❌ Los días deben ser entre 1 y 365');
+    }
 
     try {
       // Mostrar mensaje de espera
       const { key } = await sock.sendMessage(
         msg.chat,
-        { text: '⏳ *Procesando solicitud...*' },
+        { text: '⏳ *Generando licencia...*' },
         { quoted: msg }
       );
 
-      let url = '';
-      let responseText = '';
-      let data = null;
-
-      switch (subcommand) {
-        // ============================================
-        // COMANDO: GENERAR LICENCIA
-        // ============================================
-        case 'gen':
-        case 'generar':
-        case 'create': {
-          const usuario = restArgs[0]?.replace('@', '').trim() || '';
-          const dias = parseInt(restArgs[1]) || 30;
-          
-          if (!usuario) {
-            await sock.sendMessage(msg.chat, { 
-              text: '❌ *Uso correcto:* !key gen @usuario [días]',
-              edit: key 
-            });
-            return;
-          }
-
-          // Validar que los días sean válidos
-          if (dias < 1 || dias > 365) {
-            await sock.sendMessage(msg.chat, { 
-              text: '❌ Los días deben ser entre 1 y 365',
-              edit: key 
-            });
-            return;
-          }
-
-          // Construir URL para crear licencia
-          url = `${BASE_URL}/seller/?sellerkey=${SELLER_KEY}&type=add&appname=${APP_NAME}&username=${usuario}&duration=${dias}`;
-          
-          const res = await fetch(url);
-          data = await res.json();
-          
-          if (data.success) {
-            responseText = 
-              `✅ *¡Licencia generada exitosamente!*\n\n` +
-              `👤 *Usuario:* ${usuario}\n` +
-              `🔑 *Licencia:* \`${data.key || data.keys?.[0] || 'N/A'}\`\n` +
-              `📅 *Duración:* ${dias} días\n` +
-              `🆔 *App:* ${data.app_name || APP_NAME}\n` +
-              `📊 *Estado:* Activa\n\n` +
-              `📌 *Instrucciones:*\n` +
-              `1. Entregue esta clave al usuario\n` +
-              `2. El usuario debe ingresarla en la app\n` +
-              `3. Para validar use: !key validar CLAVE`;
-          } else {
-            responseText = `❌ *Error:* ${data.message || 'No se pudo generar la licencia'}`;
-          }
-          break;
-        }
-
-        // ============================================
-        // COMANDO: VALIDAR LICENCIA
-        // ============================================
-        case 'validar':
-        case 'check':
-        case 'validate': {
-          const licenseKey = restArgs[0]?.trim() || '';
-          
-          if (!licenseKey) {
-            await sock.sendMessage(msg.chat, { 
-              text: '❌ *Uso correcto:* !key validar CLAVE_LICENCIA',
-              edit: key 
-            });
-            return;
-          }
-
-          // Validar licencia usando la API pública
-          url = `${BASE_URL}/v1/licenses/validate?app_name=${APP_NAME}&license_key=${licenseKey}`;
-          
-          const res = await fetch(url);
-          data = await res.json();
-          
-          if (data.success && data.is_valid) {
-            responseText = 
-              `✅ *Licencia VÁLIDA*\n\n` +
-              `🔑 *Clave:* \`${licenseKey}\`\n` +
-              `👤 *Usuario:* ${data.username || 'N/A'}\n` +
-              `📅 *Vence:* ${data.expires || 'N/A'}\n` +
-              `📊 *Estado:* ${data.status || 'Activa'}\n` +
-              `📱 *App:* ${data.app_name || APP_NAME}`;
-          } else {
-            responseText = 
-              `❌ *Licencia INVÁLIDA*\n\n` +
-              `🔑 *Clave:* \`${licenseKey}\`\n` +
-              `📌 *Motivo:* ${data.message || 'Licencia no encontrada o expirada'}\n\n` +
-              `💡 *Sugerencia:* Verifique que la clave sea correcta o genere una nueva con !key gen`;
-          }
-          break;
-        }
-
-        // ============================================
-        // COMANDO: LISTAR USUARIOS
-        // ============================================
-        case 'listusers':
-        case 'users': {
-          url = `${BASE_URL}/seller/?sellerkey=${SELLER_KEY}&type=listusers&appname=${APP_NAME}`;
-          
-          const res = await fetch(url);
-          data = await res.json();
-          
-          if (data.success && data.users) {
-            const users = JSON.parse(data.users);
-            
-            if (users.length === 0) {
-              responseText = '📋 *No hay usuarios registrados en la aplicación*';
-            } else {
-              responseText = `👥 *Lista de Usuarios* (${users.length})\n\n`;
-              users.forEach((u, i) => {
-                responseText += `${i+1}. *${u.username}*\n`;
-                responseText += `   📧 ${u.email || 'Sin email'}\n`;
-                responseText += `   🆔 ID: ${u.user_id || 'N/A'}\n`;
-                responseText += `   📅 Creado: ${u.created_at || 'N/A'}\n\n`;
-              });
-            }
-          } else {
-            responseText = '❌ *Error:* No se pudieron obtener los usuarios';
-          }
-          break;
-        }
-
-        // ============================================
-        // COMANDO: LISTAR LICENCIAS
-        // ============================================
-        case 'listlic':
-        case 'licenses':
-        case 'list': {
-          url = `${BASE_URL}/seller/?sellerkey=${SELLER_KEY}&type=listlicenses&appname=${APP_NAME}`;
-          
-          const res = await fetch(url);
-          data = await res.json();
-          
-          if (data.success && data.licenses) {
-            const licenses = JSON.parse(data.licenses);
-            
-            if (licenses.length === 0) {
-              responseText = '📋 *No hay licencias generadas*';
-            } else {
-              responseText = `🔑 *Lista de Licencias* (${licenses.length})\n\n`;
-              licenses.forEach((l, i) => {
-                responseText += `${i+1}. *${l.key}*\n`;
-                responseText += `   👤 Usuario: ${l.username || 'N/A'}\n`;
-                responseText += `   📅 Expira: ${l.expires || 'N/A'}\n`;
-                responseText += `   📊 Estado: ${l.status || 'Activa'}\n\n`;
-              });
-            }
-          } else {
-            responseText = '❌ *Error:* No se pudieron obtener las licencias';
-          }
-          break;
-        }
-
-        // ============================================
-        // COMANDO: DESACTIVAR LICENCIA
-        // ============================================
-        case 'del':
-        case 'delete':
-        case 'desactivar': {
-          const licenseKey = restArgs[0]?.trim() || '';
-          
-          if (!licenseKey) {
-            await sock.sendMessage(msg.chat, { 
-              text: '❌ *Uso correcto:* !key del CLAVE_LICENCIA',
-              edit: key 
-            });
-            return;
-          }
-
-          // Confirmación de seguridad
-          responseText = `⚠️ *¿Estás seguro de desactivar la licencia?*\n\n` +
-                        `🔑 Clave: \`${licenseKey}\`\n` +
-                        `📌 Responde con "SI" para confirmar o "NO" para cancelar.`;
-          
-          await sock.sendMessage(msg.chat, { text: responseText, edit: key });
-          
-          // Esperar confirmación (esto es avanzado, puedes omitirlo)
-          // Por ahora, eliminamos directamente
-          url = `${BASE_URL}/seller/?sellerkey=${SELLER_KEY}&type=del&appname=${APP_NAME}&key=${licenseKey}`;
-          
-          const res = await fetch(url);
-          data = await res.json();
-          
-          if (data.success) {
-            responseText = 
-              `✅ *Licencia desactivada correctamente*\n\n` +
-              `🔑 Clave: \`${licenseKey}\`\n` +
-              `📊 Estado: Desactivada\n\n` +
-              `💡 El usuario ya no podrá usar esta licencia.`;
-          } else {
-            responseText = 
-              `❌ *Error:* ${data.message || 'No se pudo desactivar la licencia'}\n\n` +
-              `🔑 Clave: \`${licenseKey}\``;
-          }
-          break;
-        }
-
-        // ============================================
-        // COMANDO: EXTENDER LICENCIA
-        // ============================================
-        case 'extend':
-        case 'extender': {
-          const licenseKey = restArgs[0]?.trim() || '';
-          const dias = parseInt(restArgs[1]) || 30;
-          
-          if (!licenseKey) {
-            await sock.sendMessage(msg.chat, { 
-              text: '❌ *Uso correcto:* !key extend CLAVE [días]',
-              edit: key 
-            });
-            return;
-          }
-
-          if (dias < 1 || dias > 365) {
-            await sock.sendMessage(msg.chat, { 
-              text: '❌ Los días deben ser entre 1 y 365',
-              edit: key 
-            });
-            return;
-          }
-
-          url = `${BASE_URL}/seller/?sellerkey=${SELLER_KEY}&type=extend&appname=${APP_NAME}&key=${licenseKey}&days=${dias}`;
-          
-          const res = await fetch(url);
-          data = await res.json();
-          
-          if (data.success) {
-            responseText = 
-              `✅ *Licencia extendida correctamente*\n\n` +
-              `🔑 Clave: \`${licenseKey}\`\n` +
-              `📅 Días añadidos: ${dias}\n` +
-              `📊 Nueva fecha de expiración: ${data.new_expiry || 'N/A'}`;
-          } else {
-            responseText = `❌ *Error:* ${data.message || 'No se pudo extender la licencia'}`;
-          }
-          break;
-        }
-
-        // ============================================
-        // COMANDO: INFORMACIÓN DE LA APP
-        // ============================================
-        case 'info':
-        case 'estado': {
-          url = `${BASE_URL}/seller/?sellerkey=${SELLER_KEY}&type=appinfo&appname=${APP_NAME}`;
-          
-          const res = await fetch(url);
-          data = await res.json();
-          
-          if (data.success) {
-            responseText = 
-              `📱 *Información de ByPass-TopKoalas*\n\n` +
-              `🏷️ *Nombre:* ${data.appname || APP_NAME}\n` +
-              `👤 *Propietario:* ${data.owner || 'phERRrODUI'}\n` +
-              `📊 *Estado:* ${data.status || 'Activa'}\n` +
-              `🔢 *Total usuarios:* ${data.total_users || 'N/A'}\n` +
-              `🔑 *Total licencias:* ${data.total_licenses || 'N/A'}\n` +
-              `📅 *Creada:* ${data.created_at || 'N/A'}\n\n` +
-              `💡 *Comandos disponibles:* !key help`;
-          } else {
-            responseText = '❌ *Error:* No se pudo obtener la información de la aplicación';
-          }
-          break;
-        }
-
-        // ============================================
-        // COMANDO: AYUDA
-        // ============================================
-        case 'help':
-        case 'ayuda':
-        default: {
-          responseText = 
-            `📚 *Sistema de Licencias - ByPass-TopKoalas*\n\n` +
-            `🔹 *Generar licencia*\n` +
-            `   !key gen @usuario [días]\n` +
-            `   Ej: !key gen @Danizin 30\n\n` +
-            `🔹 *Validar licencia*\n` +
-            `   !key validar CLAVE\n` +
-            `   Ej: !key validar 1BKN19-UFBGLG-RCWWSY\n\n` +
-            `🔹 *Listar usuarios*\n` +
-            `   !key listusers\n\n` +
-            `🔹 *Listar licencias*\n` +
-            `   !key listlic\n\n` +
-            `🔹 *Desactivar licencia*\n` +
-            `   !key del CLAVE\n` +
-            `   Ej: !key del 1BKN19-UFBGLG-RCWWSY\n\n` +
-            `🔹 *Extender licencia*\n` +
-            `   !key extend CLAVE [días]\n` +
-            `   Ej: !key extend 1BKN19-UFBGLG-RCWWSY 15\n\n` +
-            `🔹 *Información de la app*\n` +
-            `   !key info\n\n` +
-            `🔹 *Esta ayuda*\n` +
-            `   !key help\n\n` +
-            `📌 *Nota:* Todos los comandos son para administradores`;
-          break;
-        }
-      }
-
-      // Enviar respuesta final
-      await sock.sendMessage(msg.chat, { text: responseText, edit: key });
-
-    } catch (error) {
-      console.error('❌ Error en KeyAuth:', error);
+      // Construir URL para crear licencia
+      const url = `${BASE_URL}/seller/?sellerkey=${SELLER_KEY}&type=add&appname=${APP_NAME}&username=${usuario}&duration=${dias}`;
       
-      let errorMessage = '❌ *Error al procesar la solicitud*\n\n';
+      const res = await fetch(url);
+      const data = await res.json();
       
-      if (error.message.includes('Premature close')) {
-        errorMessage += '⚠️ La conexión con la API se cerró inesperadamente.\n';
-        errorMessage += '💡 Intenta nuevamente en unos segundos.';
-      } else if (error.message.includes('fetch')) {
-        errorMessage += '⚠️ Error de conexión con el servidor.\n';
-        errorMessage += '💡 Verifica tu conexión a internet.';
+      if (data.success) {
+        const responseText = 
+          `✅ *¡Licencia generada exitosamente!*\n\n` +
+          `👤 *Usuario:* ${usuario}\n` +
+          `🔑 *Licencia:* \`${data.key || data.keys?.[0] || 'N/A'}\`\n` +
+          `📅 *Duración:* ${dias} días\n` +
+          `📱 *App:* ${data.app_name || APP_NAME}\n` +
+          `📊 *Estado:* Activa\n\n` +
+          `💡 *Para validar:* !validarlic ${data.key || data.keys?.[0]}`;
+
+        await sock.sendMessage(msg.chat, { text: responseText, edit: key });
       } else {
-        errorMessage += `📌 Detalle: ${error.message}`;
+        await sock.sendMessage(msg.chat, { 
+          text: `❌ *Error:* ${data.message || 'No se pudo generar la licencia'}`,
+          edit: key 
+        });
       }
       
-      await msg.reply(errorMessage);
+    } catch (error) {
+      console.error('Error en genLicense:', error);
+      await msg.reply(`❌ Error: ${error.message}`);
     }
+  },
+};
+
+// ============================================
+// COMANDO 2: CREAR USUARIO
+// ============================================
+export const createUser = {
+  command: ['crearuser', 'newuser', 'cu'],
+  category: 'admin',
+  run: async ({ msg, sock, args, command }) => {
+    
+    const username = args[0]?.trim() || '';
+    const password = args[1]?.trim() || '';
+    const email = args[2]?.trim() || `${username}@temp.com`;
+    
+    if (!username || !password) {
+      return msg.reply(
+        `❌ *Uso correcto:*\n` +
+        `!crearuser USUARIO CONTRASEÑA [EMAIL]\n\n` +
+        `📌 *Ejemplos:*\n` +
+        `!crearuser Danizin MiClave123\n` +
+        `!crearuser Juan Pass456 juan@email.com\n\n` +
+        `📌 *Requisitos:*\n` +
+        `• Usuario: mínimo 3 caracteres\n` +
+        `• Contraseña: mínimo 6 caracteres`
+      );
+    }
+
+    // Validar longitud
+    if (username.length < 3) {
+      return msg.reply('❌ El usuario debe tener al menos 3 caracteres');
+    }
+    
+    if (password.length < 6) {
+      return msg.reply('❌ La contraseña debe tener al menos 6 caracteres');
+    }
+
+    try {
+      // Mostrar mensaje de espera
+      const { key } = await sock.sendMessage(
+        msg.chat,
+        { text: '⏳ *Creando usuario...*' },
+        { quoted: msg }
+      );
+
+      // Construir URL para crear usuario
+      const url = `${BASE_URL}/seller/?sellerkey=${SELLER_KEY}&type=adduser&appname=${APP_NAME}&user=${username}&pass=${password}&email=${encodeURIComponent(email)}`;
+      
+      const res = await fetch(url);
+      const data = await res.json();
+      
+      if (data.success) {
+        const responseText = 
+          `✅ *¡Usuario creado exitosamente!*\n\n` +
+          `👤 *Usuario:* ${username}\n` +
+          `🔑 *Contraseña:* \`${password}\`\n` +
+          `📧 *Email:* ${email}\n` +
+          `📱 *App:* ${data.app_name || APP_NAME}\n` +
+          `📊 *Estado:* Activo\n\n` +
+          `💡 *Para generar licencia:* !genlic @${username} 30`;
+
+        await sock.sendMessage(msg.chat, { text: responseText, edit: key });
+      } else {
+        let errorMsg = data.message || 'No se pudo crear el usuario';
+        
+        // Mensajes de error más amigables
+        if (errorMsg.includes('already exists')) {
+          errorMsg = `El usuario *${username}* ya existe. Prueba con otro nombre.`;
+        } else if (errorMsg.includes('invalid')) {
+          errorMsg = 'Datos inválidos. Verifica el usuario y contraseña.';
+        }
+        
+        await sock.sendMessage(msg.chat, { 
+          text: `❌ *Error:* ${errorMsg}`,
+          edit: key 
+        });
+      }
+      
+    } catch (error) {
+      console.error('Error en createUser:', error);
+      await msg.reply(`❌ Error: ${error.message}`);
+    }
+  },
+};
+
+// ============================================
+// COMANDO 3: CREAR USUARIO CON LICENCIA (COMBO)
+// ============================================
+export const createUserWithLicense = {
+  command: ['crearfull', 'newfull', 'cf'],
+  category: 'admin',
+  run: async ({ msg, sock, args, command }) => {
+    
+    const username = args[0]?.trim() || '';
+    const password = args[1]?.trim() || '';
+    const dias = parseInt(args[2]) || 30;
+    const email = args[3]?.trim() || `${username}@temp.com`;
+    
+    if (!username || !password) {
+      return msg.reply(
+        `❌ *Uso correcto:*\n` +
+        `!crearfull USUARIO CONTRASEÑA [DÍAS] [EMAIL]\n\n` +
+        `📌 *Ejemplos:*\n` +
+        `!crearfull Danizin MiClave123 30\n` +
+        `!crearfull Juan Pass456 7 juan@email.com\n\n` +
+        `💡 *Este comando crea usuario Y genera licencia automáticamente*`
+      );
+    }
+
+    if (username.length < 3) {
+      return msg.reply('❌ El usuario debe tener al menos 3 caracteres');
+    }
+    
+    if (password.length < 6) {
+      return msg.reply('❌ La contraseña debe tener al menos 6 caracteres');
+    }
+
+    if (dias < 1 || dias > 365) {
+      return msg.reply('❌ Los días deben ser entre 1 y 365');
+    }
+
+    try {
+      // Mostrar mensaje de espera
+      const { key } = await sock.sendMessage(
+        msg.chat,
+        { text: '⏳ *Creando usuario y generando licencia...*' },
+        { quoted: msg }
+      );
+
+      // PASO 1: Crear usuario
+      const userUrl = `${BASE_URL}/seller/?sellerkey=${SELLER_KEY}&type=adduser&appname=${APP_NAME}&user=${username}&pass=${password}&email=${encodeURIComponent(email)}`;
+      
+      const userRes = await fetch(userUrl);
+      const userData = await userRes.json();
+      
+      if (!userData.success) {
+        let errorMsg = userData.message || 'No se pudo crear el usuario';
+        if (errorMsg.includes('already exists')) {
+          errorMsg = `El usuario *${username}* ya existe. Prueba con otro nombre.`;
+        }
+        await sock.sendMessage(msg.chat, { 
+          text: `❌ *Error al crear usuario:* ${errorMsg}`,
+          edit: key 
+        });
+        return;
+      }
+
+      // PASO 2: Generar licencia para el usuario
+      const licUrl = `${BASE_URL}/seller/?sellerkey=${SELLER_KEY}&type=add&appname=${APP_NAME}&username=${username}&duration=${dias}`;
+      
+      const licRes = await fetch(licUrl);
+      const licData = await licRes.json();
+      
+      if (licData.success) {
+        const responseText = 
+          `✅ *¡Usuario y licencia creados exitosamente!*\n\n` +
+          `👤 *Usuario:* ${username}\n` +
+          `🔑 *Contraseña:* \`${password}\`\n` +
+          `📧 *Email:* ${email}\n` +
+          `🔑 *Licencia:* \`${licData.key || licData.keys?.[0] || 'N/A'}\`\n` +
+          `📅 *Duración:* ${dias} días\n` +
+          `📱 *App:* ${licData.app_name || APP_NAME}\n\n` +
+          `💡 *Para validar:* !validarlic ${licData.key || licData.keys?.[0]}\n` +
+          `💡 *Para generar otra licencia:* !genlic @${username} 30`;
+
+        await sock.sendMessage(msg.chat, { text: responseText, edit: key });
+      } else {
+        await sock.sendMessage(msg.chat, { 
+          text: `⚠️ *Usuario creado pero error al generar licencia*\n\n` +
+                `👤 Usuario: ${username}\n` +
+                `❌ Error: ${licData.message || 'No se pudo generar la licencia'}\n\n` +
+                `💡 Puedes generar licencia manualmente con: !genlic @${username}`,
+          edit: key 
+        });
+      }
+      
+    } catch (error) {
+      console.error('Error en createUserWithLicense:', error);
+      await msg.reply(`❌ Error: ${error.message}`);
+    }
+  },
+};
+
+// ============================================
+// COMANDO 4: VALIDAR LICENCIA
+// ============================================
+export const validateLicense = {
+  command: ['validarlic', 'checklic', 'vl'],
+  category: 'admin',
+  run: async ({ msg, sock, args, command }) => {
+    
+    const licenseKey = args[0]?.trim() || '';
+    
+    if (!licenseKey) {
+      return msg.reply(
+        `❌ *Uso correcto:*\n` +
+        `!validarlic CLAVE_LICENCIA\n\n` +
+        `📌 *Ejemplo:* !validarlic 1BKN19-UFBGLG-RCWWSY`
+      );
+    }
+
+    try {
+      const { key } = await sock.sendMessage(
+        msg.chat,
+        { text: '⏳ *Validando licencia...*' },
+        { quoted: msg }
+      );
+
+      const url = `${BASE_URL}/v1/licenses/validate?app_name=${APP_NAME}&license_key=${licenseKey}`;
+      
+      const res = await fetch(url);
+      const data = await res.json();
+      
+      if (data.success && data.is_valid) {
+        const responseText = 
+          `✅ *Licencia VÁLIDA*\n\n` +
+          `🔑 *Clave:* \`${licenseKey}\`\n` +
+          `👤 *Usuario:* ${data.username || 'N/A'}\n` +
+          `📅 *Vence:* ${data.expires || 'N/A'}\n` +
+          `📊 *Estado:* ${data.status || 'Activa'}\n` +
+          `📱 *App:* ${data.app_name || APP_NAME}`;
+
+        await sock.sendMessage(msg.chat, { text: responseText, edit: key });
+      } else {
+        await sock.sendMessage(msg.chat, { 
+          text: `❌ *Licencia INVÁLIDA*\n\n` +
+                `🔑 *Clave:* \`${licenseKey}\`\n` +
+                `📌 *Motivo:* ${data.message || 'Licencia no encontrada o expirada'}`,
+          edit: key 
+        });
+      }
+      
+    } catch (error) {
+      console.error('Error en validateLicense:', error);
+      await msg.reply(`❌ Error: ${error.message}`);
+    }
+  },
+};
+
+// ============================================
+// COMANDO 5: LISTAR USUARIOS
+// ============================================
+export const listUsers = {
+  command: ['listusers', 'lu'],
+  category: 'admin',
+  run: async ({ msg, sock, args, command }) => {
+    
+    try {
+      const { key } = await sock.sendMessage(
+        msg.chat,
+        { text: '⏳ *Obteniendo lista de usuarios...*' },
+        { quoted: msg }
+      );
+
+      const url = `${BASE_URL}/seller/?sellerkey=${SELLER_KEY}&type=listusers&appname=${APP_NAME}`;
+      
+      const res = await fetch(url);
+      const data = await res.json();
+      
+      if (data.success && data.users) {
+        const users = JSON.parse(data.users);
+        
+        if (users.length === 0) {
+          await sock.sendMessage(msg.chat, { 
+            text: '📋 *No hay usuarios registrados*',
+            edit: key 
+          });
+          return;
+        }
+
+        let responseText = `👥 *Lista de Usuarios* (${users.length})\n\n`;
+        users.forEach((u, i) => {
+          responseText += `${i+1}. *${u.username}*\n`;
+          responseText += `   📧 ${u.email || 'Sin email'}\n`;
+          responseText += `   🆔 ID: ${u.user_id || 'N/A'}\n`;
+          responseText += `   📅 Creado: ${u.created_at || 'N/A'}\n\n`;
+        });
+
+        await sock.sendMessage(msg.chat, { text: responseText, edit: key });
+      } else {
+        await sock.sendMessage(msg.chat, { 
+          text: '❌ No se pudieron obtener los usuarios',
+          edit: key 
+        });
+      }
+      
+    } catch (error) {
+      console.error('Error en listUsers:', error);
+      await msg.reply(`❌ Error: ${error.message}`);
+    }
+  },
+};
+
+// ============================================
+// COMANDO 6: AYUDA
+// ============================================
+export const help = {
+  command: ['keyhelp', 'kh'],
+  category: 'admin',
+  run: async ({ msg, sock, args, command }) => {
+    
+    const responseText = 
+      `📚 *Comandos KeyAuth - ByPass-TopKoalas*\n\n` +
+      `🔹 *Generar licencia*\n` +
+      `   !genlic @usuario [días]\n` +
+      `   Ej: !genlic @Danizin 30\n\n` +
+      `🔹 *Crear usuario*\n` +
+      `   !crearuser USUARIO CONTRASEÑA [EMAIL]\n` +
+      `   Ej: !crearuser Danizin MiClave123\n\n` +
+      `🔹 *Crear usuario + licencia (combo)*\n` +
+      `   !crearfull USUARIO CONTRASEÑA [DÍAS] [EMAIL]\n` +
+      `   Ej: !crearfull Danizin MiClave123 30\n\n` +
+      `🔹 *Validar licencia*\n` +
+      `   !validarlic CLAVE\n` +
+      `   Ej: !validarlic 1BKN19-UFBGLG-RCWWSY\n\n` +
+      `🔹 *Listar usuarios*\n` +
+      `   !listusers\n\n` +
+      `🔹 *Esta ayuda*\n` +
+      `   !keyhelp\n\n` +
+      `📌 *Alias:*\n` +
+      `• genlic = gl = generarlicencia\n` +
+      `• crearuser = cu = newuser\n` +
+      `• crearfull = cf = newfull\n` +
+      `• validarlic = vl = checklic\n` +
+      `• listusers = lu`;
+
+    await msg.reply(responseText);
   },
 };
