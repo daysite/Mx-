@@ -1,4 +1,4 @@
-// commands/keyauth.js - VERSIÓN CON DÍAS PERSONALIZABLES
+// commands/keyauth.js
 import fetch from 'node-fetch';
 
 // ============================================
@@ -57,33 +57,46 @@ async function fetchWithRetry(url, maxRetries = 3) {
 }
 
 // ============================================
-// COMANDO PRINCIPAL - GENERAR LICENCIA CON DÍAS
+// COMANDO PRINCIPAL - GENERAR LICENCIA CON DÍAS OBLIGATORIOS
 // ============================================
 export default {
   command: ['key', 'auth', 'licencia', 'license', 'gen', 'generar'],
   category: 'admin',
   run: async ({ msg, sock, args, command }) => {
     
-    // Obtener los días del argumento
-    let dias = 30; // Valor por defecto: 30 días
-    
-    if (args.length > 0) {
-      const parsed = parseInt(args[0]);
-      if (!isNaN(parsed) && parsed > 0) {
-        dias = parsed;
-      } else {
-        return msg.reply(
-          `❌ *El valor debe ser un número válido*\n\n` +
-          `📌 *Ejemplos:*\n` +
-          `!key 1   - Licencia de 1 día\n` +
-          `!key 7   - Licencia de 7 días\n` +
-          `!key 30  - Licencia de 30 días\n` +
-          `!key     - Licencia de 30 días (por defecto)`
-        );
-      }
+    // ============================================
+    // VALIDACIÓN: SI NO HAY ARGUMENTOS, MOSTRAR ERROR
+    // ============================================
+    if (!args || args.length === 0) {
+      return msg.reply(
+        `❌ *Falta especificar los días*\n\n` +
+        `📌 *Uso correcto:*\n` +
+        `!key [días]\n\n` +
+        `📌 *Ejemplos:*\n` +
+        `!key 1   - Licencia de 1 día\n` +
+        `!key 7   - Licencia de 7 días\n` +
+        `!key 30  - Licencia de 30 días\n` +
+        `!key 365 - Licencia de 1 año\n\n` +
+        `💡 *Recuerda:* Debes especificar cuántos días quieres que dure la licencia.`
+      );
     }
     
-    // Validar días (mínimo 1, máximo 365)
+    // Obtener los días del argumento
+    const dias = parseInt(args[0]);
+    
+    // Validar que sea un número válido
+    if (isNaN(dias) || dias <= 0) {
+      return msg.reply(
+        `❌ *El valor debe ser un número válido*\n\n` +
+        `📌 *Ejemplos:*\n` +
+        `!key 1   - Licencia de 1 día\n` +
+        `!key 7   - Licencia de 7 días\n` +
+        `!key 30  - Licencia de 30 días\n` +
+        `!key 365 - Licencia de 1 año`
+      );
+    }
+    
+    // Validar rango (mínimo 1, máximo 365)
     if (dias < 1 || dias > 365) {
       return msg.reply(
         `❌ *Los días deben ser entre 1 y 365*\n\n` +
@@ -230,12 +243,13 @@ export const help = {
       `   Ej: !key 1   (1 día)\n` +
       `   Ej: !key 7   (7 días)\n` +
       `   Ej: !key 30  (30 días)\n` +
-      `   Ej: !key     (30 días por defecto)\n\n` +
+      `   Ej: !key 365 (1 año)\n\n` +
       `🔹 *Validar licencia*\n` +
       `   !validar CLAVE\n` +
       `   Ej: !validar 1BKN19-UFBGLG-RCWWSY\n\n` +
       `🔹 *Alias disponibles:*\n` +
       `   !gen, !generar, !licencia, !auth, !license\n\n` +
+      `📌 *Importante:* Debes especificar los días, no se acepta solo !key\n` +
       `📌 *Rango permitido:* 1 a 365 días`;
 
     await msg.reply(responseText);
